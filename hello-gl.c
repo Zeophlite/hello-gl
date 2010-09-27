@@ -1,13 +1,10 @@
 #include <stdlib.h>
+#define GLEW_STATIC
 #include <GL/glew.h>
-#ifdef __APPLE__
-#  include <GLUT/glut.h>
-#else
-#  include <GL/glut.h>
-#endif
 #include <math.h>
 #include <stdio.h>
 #include "util.h"
+#include "sdl.h"
 
 /*
  * Global data used by our render callback:
@@ -17,7 +14,7 @@ static struct {
     GLuint vertex_buffer, element_buffer;
     GLuint textures[2];
     GLuint vertex_shader, fragment_shader, program;
-    
+
     struct {
         GLint fade_factor;
         GLint textures[2];
@@ -135,7 +132,7 @@ static GLuint make_program(GLuint vertex_shader, GLuint fragment_shader)
 /*
  * Data used to seed our vertex array and element array buffers:
  */
-static const GLfloat g_vertex_buffer_data[] = { 
+static const GLfloat g_vertex_buffer_data[] = {
     -1.0f, -1.0f,
      1.0f, -1.0f,
     -1.0f,  1.0f,
@@ -201,17 +198,19 @@ static int make_resources(void)
  */
 static void update_fade_factor(void)
 {
-    int milliseconds = glutGet(GLUT_ELAPSED_TIME);
+    int milliseconds = SDL_GetTicks();
     g_resources.fade_factor = sinf((float)milliseconds * 0.001f) * 0.5f + 0.5f;
-    glutPostRedisplay();
 }
 
 static void render(void)
 {
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
     glUseProgram(g_resources.program);
 
     glUniform1f(g_resources.uniforms.fade_factor, g_resources.fade_factor);
-    
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, g_resources.textures[0]);
     glUniform1i(g_resources.uniforms.textures[0], 0);
@@ -240,23 +239,20 @@ static void render(void)
     );
 
     glDisableVertexAttribArray(g_resources.attributes.position);
-    glutSwapBuffers();
+    SDL_GL_SwapBuffers();
 }
+
+extern int done;
 
 /*
  * Entry point
  */
 int main(int argc, char** argv)
 {
-    glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
-    glutInitWindowSize(400, 300);
-    glutCreateWindow("Hello World");
-    glutIdleFunc(&update_fade_factor);
-    glutDisplayFunc(&render);
+    initSDL();
 
     glewInit();
-    if (!GLEW_VERSION_2_0) {
+    if (!glewIsSupported("GL_VERSION_2_0")) {
         fprintf(stderr, "OpenGL 2.0 not available\n");
         return 1;
     }
@@ -266,7 +262,13 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    glutMainLoop();
+    while (!done) {
+        handleInput();
+        update_timer();
+        render();
+    }
+
+    SDL_Quit();
     return 0;
 }
 
